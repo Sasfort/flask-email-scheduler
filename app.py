@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from flask import Flask, request
 from flask_apscheduler import APScheduler
+from flask_mail import Mail, Message
 import os
 import psycopg2
 import psycopg2.extras
@@ -41,11 +42,20 @@ DELETE_RECIPIENT = (
 )
 
 load_dotenv()
+
 app = Flask(__name__)
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USERNAME'] = os.getenv("SENDER_EMAIL")
+app.config['MAIL_PASSWORD'] = os.getenv("SENDER_PASSWORD")
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+
 db_url = os.getenv("DATABASE_URL")
 connection = psycopg2.connect(db_url)
 sched = APScheduler()
+mail = Mail(app)
 
 
 @app.get('/')
@@ -141,17 +151,35 @@ def delete_recipient(id):
 
 
 def check_events():
-    with connection:
-        with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            cursor.execute(GET_ALL_EVENTS)
-            event_list = cursor.fetchall()
-    for event in event_list:
-        if event['timestamp'] <= datetime.now():
-            count += 1
+    with app.app_context():
+        with connection:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                cursor.execute(GET_ALL_EVENTS)
+                event_list = cursor.fetchall()
+        with connection:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                cursor.execute(GET_ALL_RECIPIENTS)
+                recipient_list = cursor.fetchall()
+        recipient_email_list = []
+        for recipient in recipient_list:
+            recipient_email_list.append(recipient['email'])
+        for event in event_list:
+            if event['timestamp'] <= datetime.now():
+                msg = Message(
+                    event['email_subject'],
+                    sender=os.getenv("SENDER_EMAIL"),
+                    recipients=recipient_email_list,
+                    body=event['email_content']
+                )
+                mail.send(msg)
+                delete_event(event['id'])
+                print('Email with id {} successfully sent to'.format(
+                    event['id']), recipient_email_list)
 
 
 if __name__ == '__main__':
+
     sched.add_job(id='check_events', func=check_events,
-                  trigger='interval', seconds=5)
+                  trigger='interval', minutes=1)
     sched.start()
     app.run(debug=True, use_reloader=False)

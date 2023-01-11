@@ -1,4 +1,5 @@
 flask
 flask_apscheduler
+flask_mail
 psycopg2-binary
 python-dotenv
