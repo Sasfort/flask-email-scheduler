@@ -65,7 +65,7 @@ def home():
     return "Hello world!"
 
 
-@app.post('/api/event')
+@app.post('/save_emails')
 def create_event():
     data = request.get_json()
     event_id = data['event_id']
@@ -92,7 +92,7 @@ def create_event():
     }, 201
 
 
-@app.get("/api/event")
+@app.get("/view_emails")
 def get_all_events():
     with connection:
         with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
@@ -104,7 +104,7 @@ def get_all_events():
     }, 200
 
 
-@app.delete("/api/event/<int:id>")
+@app.delete("/delete_emails/<int:id>")
 def delete_event(id):
     with connection:
         with connection.cursor() as cursor:
@@ -116,7 +116,7 @@ def delete_event(id):
     }, 201
 
 
-@app.post('/api/recipient')
+@app.post('/save_recipients')
 def add_recipient():
     data = request.get_json()
     email = data['email']
@@ -131,7 +131,7 @@ def add_recipient():
     }, 201
 
 
-@app.get('/api/recipient')
+@app.get('/view_recipients')
 def get_all_recipients():
     with connection:
         with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
@@ -143,7 +143,7 @@ def get_all_recipients():
     }, 200
 
 
-@app.delete("/api/recipient/<int:id>")
+@app.delete("/delete_recipients/<int:id>")
 def delete_recipient(id):
     with connection:
         with connection.cursor() as cursor:
@@ -188,6 +188,6 @@ def check_events():
 if __name__ == '__main__':
 
     sched.add_job(id='check_events', func=check_events,
-                  trigger='interval', seconds=5)
+                  trigger='interval', minutes=1)
     sched.start()
     app.run(debug=True, use_reloader=False)
